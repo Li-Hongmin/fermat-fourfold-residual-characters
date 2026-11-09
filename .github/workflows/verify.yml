@@ -1,0 +1,82 @@
+name: verify
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare a fresh working copy
+        run: cp -r verification work
+      - name: Unpack calculation bundles
+        working-directory: work
+        run: unzip -q calculations-bundles.zip
+      - name: SHA-256 check of the supplement
+        working-directory: work
+        run: sha256sum -c --quiet CONTENTS.sha256
+      - name: "Proposition 4.1: exhaustive census through degree 105 (two independent enumerators)"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python -I calculations/bundles/xcheck-hodge-r5-2026-11-02/replay_base.py scratch/finite-base-replay
+      - name: "Closure check"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/odd-fourfolds-le599-checked-closure/verify_closure.py
+      - name: "Short semiprime classification"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/odd-fourfolds-le599-checked-closure/verify_short_semiprime_classification.py
+      - name: "Two-prime depth"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/odd-fourfolds-le599-checked-closure/verify_two_prime_depth.py
+      - name: "Depth extensions"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python -I calculations/bundles/odd-fourfolds-le599-checked-closure/verify_depth_extensions.py
+      - name: "Positive finite reduction"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/odd-fourfolds-le599-checked-closure/verify_positive_finite_reduction.py
+      - name: "Contraction block count at N=35"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/xcheck-hodge-thm720-2026-10-29/block_E0.py 35
+      - name: "R4 census check"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          python calculations/bundles/xcheck-hodge-thm720-2026-10-29/verify_r4_census.py
+      - name: "Uniform check at the eight degrees of Proposition 7.21"
+        working-directory: work
+        env: {OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1'}
+        run: |
+          set -eo pipefail
+          cd calculations/bundles/xc-uniform-check-2026-11-04 && python -I xc_uniform_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-output
+          path: work/
+          retention-days: 14
